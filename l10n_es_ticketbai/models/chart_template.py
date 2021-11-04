@@ -1,3 +1,5 @@
+# -*- encoding: utf-8 -*-
+
 # Copyright 2021 Binovo IT Human Project SL
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 from odoo import models, fields, api, _
@@ -42,7 +44,7 @@ class AccountChartTemplate(models.Model):
 
     @api.multi
     def _get_fp_vals(self, company, position):
-        res = super()._get_fp_vals(company, position)
+        res = super(AccountChartTemplate, self)._get_fp_vals(company, position)
         res.update({
             'tbai_vat_regime_key': position.tbai_vat_regime_key.id,
             'tbai_vat_regime_key2': position.tbai_vat_regime_key2.id,
@@ -52,7 +54,7 @@ class AccountChartTemplate(models.Model):
 
     @api.multi
     def create_record_with_xmlid(self, company, template, model, vals):
-        res_id = super().create_record_with_xmlid(company, template, model, vals)
+        res_id = super(AccountChartTemplate, self).create_record_with_xmlid(company, template, model, vals)
         if 'account.fiscal.position' == model:
             fiscal_position = self.env['account.fiscal.position'].browse(res_id)
             tbai_vat_exemptions = []
