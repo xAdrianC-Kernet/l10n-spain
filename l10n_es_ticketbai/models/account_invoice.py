@@ -114,7 +114,7 @@ class AccountInvoice(models.Model):
                     fiscal_position.tbai_vat_regime_key2.id
                 vals['tbai_vat_regime_key3'] = \
                     fiscal_position.tbai_vat_regime_key3.id
-        return super().create(vals)
+        return super(AccountInvoice, self).create(vals)
 
     @api.depends(
         'tbai_invoice_ids', 'tbai_invoice_ids.state',
