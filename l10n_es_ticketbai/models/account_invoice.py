@@ -61,6 +61,13 @@ class AccountInvoice(models.Model):
         comodel_name='tbai.invoice.refund.origin',
         inverse_name='account_refund_invoice_id',
         string='TicketBAI Refund Origin References')
+    tbai_refund_invoice_domain_ids = fields.Many2many(
+        comodel_name='account.invoice',
+        relation="tbai_refund_account_invoice_domain_rel",
+        compute='_compute_tbai_refund_invoice_domain_ids',
+        column1="invoice_id",
+        column2="tbai_refund_invoice_id",
+        string='Refund domain invoice ids')
 
     @api.multi
     @api.constrains('state')
@@ -123,6 +130,19 @@ class AccountInvoice(models.Model):
         for record in self:
             record.tbai_datetime_invoice = fields.Datetime.now()
 
+    @api.depends('type', 'partner_id')
+    def _compute_tbai_refund_invoice_domain_ids(self):
+        for record in self:
+            tbai_refund_domain = [('type', '=', 'out_invoice'),
+                                  ('state', '=', 'open'),
+                                  ('company_id', '=', record.company_id.id),
+                                  ('partner_id', '=', record.partner_id.id)]
+            tbai_refund_invoice_domain_ids = \
+                self.env['account.invoice'].search(tbai_refund_domain)
+            if tbai_refund_invoice_domain_ids:
+                record.tbai_refund_invoice_domain_ids = \
+                    [(6, 0, tbai_refund_invoice_domain_ids.ids)]
+
     @api.onchange('fiscal_position_id')
     def onchange_fiscal_position_id_tbai_vat_regime_key(self):
         if self.fiscal_position_id:
@@ -156,6 +176,14 @@ class AccountInvoice(models.Model):
                             "Customer Credit Notes.")
                     }
                 }
+
+    @api.onchange('refund_invoice_id')
+    def onchange_tbai_refund_invoice_id(self):
+        if self.refund_invoice_id:
+            if not self.tbai_refund_type:
+                self.tbai_refund_type = RefundType.differences.value
+            if not self.tbai_refund_key:
+                self.tbai_refund_key = RefundCode.R1.value
 
     def tbai_prepare_invoice_values(self):
 
@@ -374,9 +402,12 @@ class AccountInvoice(models.Model):
         tbai_invoices = self.sudo().env['account.invoice']
         tbai_invoices |= self.sudo().filtered(
             lambda x: x.tbai_enabled and 'out_invoice' == x.type)
-        refund_invoices = self.sudo().filtered(
-            lambda x: x.tbai_enabled and 'out_refund' == x.type and
-            x.tbai_refund_type == RefundType.differences.value)
+        refund_invoices = \
+            self.sudo().filtered(
+                lambda x:
+                x.tbai_enabled and 'out_refund' == x.type and
+                not x.tbai_refund_type or
+                x.tbai_refund_type == RefundType.differences.value)
 
         validate_refund_invoices()
         tbai_invoices |= refund_invoices
