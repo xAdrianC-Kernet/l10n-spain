@@ -11,6 +11,14 @@ from odoo.addons.l10n_es_ticketbai_api.ticketbai.xml_schema import TicketBaiSche
 
 INVOICE_NUMBER_RE = re.compile(r'^(.*\D)?(\d*)$')
 
+TBAI_STATES = [
+    ('draft', 'Not sent'),
+    ('pending', 'Pending'),
+    ('sent', 'Sent'),
+    ('cancel', 'Cancelled'),
+    ('error', 'Failed'),
+]
+
 
 class AccountInvoice(models.Model):
     _inherit = 'account.invoice'
@@ -68,6 +76,12 @@ class AccountInvoice(models.Model):
         column1="invoice_id",
         column2="tbai_refund_invoice_id",
         string='Refund domain invoice ids')
+    tbai_state = fields.Selection(
+        selection=TBAI_STATES, string="TBAI send state", default='draft',
+        readonly=True, copy=False, store=True, compute="_compute_tbai_state",
+        help="Indicates the state of this invoice in relation with the "
+             "presentation at TicketBAI Tax Agency",
+    )
 
     @api.multi
     @api.constrains('state')
@@ -509,6 +523,25 @@ class AccountInvoice(models.Model):
         else:
             res = None
         return res
+
+    @api.depends(
+        'tbai_invoice_ids', 'tbai_invoice_ids.state',
+        'tbai_cancellation_ids', 'tbai_cancellation_ids.state'
+    )
+    def _compute_tbai_state(self):
+        for inv in self:
+            if inv.tbai_cancellation_ids:
+                tbai_cancellation_ids = inv.tbai_cancellation_ids.ids
+                inv.tbai_state = self.env['tbai.invoice'].search(
+                    [('id', 'in', tbai_cancellation_ids)], order="id desc",
+                    limit=1).state
+            elif inv.tbai_invoice_ids:
+                tbai_invoice_ids = inv.tbai_invoice_ids.ids
+                inv.tbai_state = self.env['tbai.invoice'].search(
+                    [('id', 'in', tbai_invoice_ids)], order="id desc",
+                    limit=1).state
+            else:
+                inv.tbai_state = 'draft'
 
 
 class AccountInvoiceLine(models.Model):
